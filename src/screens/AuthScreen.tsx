@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,16 +13,23 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useBookingStore } from '../store/useBookingStore';
+import { loadGoogleGsiScript, promptGoogleSignIn } from '../services/googleAuth';
 
 export const AuthScreen: React.FC = () => {
   const login = useBookingStore((state) => state.login);
+  const loginWithGoogle = useBookingStore((state) => state.loginWithGoogle);
   const register = useBookingStore((state) => state.register);
 
   const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
 
+  // Pre-load Google Sign-In script on web
+  useEffect(() => {
+    loadGoogleGsiScript();
+  }, []);
+
   // Login Form States
-  const [loginEmail, setLoginEmail] = useState('quangpnn.23it@vku.udn.vn');
-  const [loginPassword, setLoginPassword] = useState('123');
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
   const [showLoginPassword, setShowLoginPassword] = useState(false);
 
   // Register Form States
@@ -38,6 +45,7 @@ export const AuthScreen: React.FC = () => {
   // UI status
   const [errorMessage, setErrorMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
   const handleLogin = async () => {
     setErrorMessage('');
@@ -66,6 +74,34 @@ export const AuthScreen: React.FC = () => {
     setIsLoading(true);
     await login('quangpnn.23it@vku.udn.vn', '123');
     setIsLoading(false);
+  };
+
+  const handleGoogleLogin = async () => {
+    setErrorMessage('');
+    setIsGoogleLoading(true);
+
+    try {
+      const googleAuthRes = await promptGoogleSignIn();
+
+      if (!googleAuthRes.success || !googleAuthRes.user) {
+        setIsGoogleLoading(false);
+        if (googleAuthRes.error) {
+          setErrorMessage(googleAuthRes.error);
+        }
+        return;
+      }
+
+      // Login or register with real Google account data
+      const result = await loginWithGoogle(googleAuthRes.user);
+      setIsGoogleLoading(false);
+
+      if (!result.success) {
+        setErrorMessage(result.error || 'Google sign-in failed. Please try again.');
+      }
+    } catch (err: any) {
+      setIsGoogleLoading(false);
+      setErrorMessage(err.message || 'Lỗi kết nối với tài khoản Google.');
+    }
   };
 
   const handleRegister = async () => {
@@ -267,10 +303,29 @@ export const AuthScreen: React.FC = () => {
                   </Text>
                 </TouchableOpacity>
 
+                {/* Google Sign-In Button */}
+                <TouchableOpacity
+                  style={[styles.googleButton, isGoogleLoading && styles.disabledButton]}
+                  onPress={handleGoogleLogin}
+                  disabled={isGoogleLoading || isLoading}
+                  activeOpacity={0.85}
+                >
+                  {isGoogleLoading ? (
+                    <Text style={styles.googleButtonText}>Signing in with Google...</Text>
+                  ) : (
+                    <>
+                      <View style={styles.googleIconBox}>
+                        <Text style={styles.googleG}>G</Text>
+                      </View>
+                      <Text style={styles.googleButtonText}>Continue with Google</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+
                 {/* Divider */}
                 <View style={styles.dividerRow}>
                   <View style={styles.dividerLine} />
-                  <Text style={styles.dividerText}>OR TRY IT OUT QUICKLY</Text>
+                  <Text style={styles.dividerText}>OR</Text>
                   <View style={styles.dividerLine} />
                 </View>
 
@@ -455,6 +510,25 @@ export const AuthScreen: React.FC = () => {
                     {isLoading ? 'Creating account...' : 'Sign up for an account now'}
                   </Text>
                 </TouchableOpacity>
+
+                {/* Google Sign-Up Button */}
+                <TouchableOpacity
+                  style={[styles.googleButton, isGoogleLoading && styles.disabledButton]}
+                  onPress={handleGoogleLogin}
+                  disabled={isGoogleLoading || isLoading}
+                  activeOpacity={0.85}
+                >
+                  {isGoogleLoading ? (
+                    <Text style={styles.googleButtonText}>Connecting to Google...</Text>
+                  ) : (
+                    <>
+                      <View style={styles.googleIconBox}>
+                        <Text style={styles.googleG}>G</Text>
+                      </View>
+                      <Text style={styles.googleButtonText}>Sign up with Google</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
               </View>
             )}
           </View>
@@ -462,7 +536,7 @@ export const AuthScreen: React.FC = () => {
           {/* Footer Info */}
           <View style={styles.footer}>
             <Text style={styles.footerText}>
-              Vietnam-Korea University of Information and Communication TechnologyTrường Đại học Công nghệ Thông tin & Truyền thông Việt - Hàn
+              Vietnam-Korea University of Information and Communication Technology
             </Text>
             <Text style={styles.footerSubText}>
               The University of Danang • 470 Trần Đại Nghĩa, Ngũ Hành Sơn, Đà Nẵng
@@ -702,5 +776,41 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     textAlign: 'center',
     marginTop: 3,
+  },
+  googleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: 10,
+    height: 48,
+    marginTop: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  googleIconBox: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#4285F4',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  googleG: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+    lineHeight: 18,
+  },
+  googleButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1E293B',
   },
 });

@@ -94,6 +94,12 @@ interface BookingState {
   isAuthenticated: boolean;
   users: UserAccount[];
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  loginWithGoogle: (googleData: {
+    email: string;
+    name: string;
+    avatarUrl?: string;
+    id?: string;
+  }) => Promise<{ success: boolean; error?: string }>;
   register: (accountData: {
     email: string;
     password: string;
@@ -144,16 +150,16 @@ export const useBookingStore = create<BookingState>()(
   persist(
     (set, get) => ({
       // Authentication
-      isAuthenticated: true,
+      isAuthenticated: false,
       users: INITIAL_ACCOUNTS,
 
       login: async (email: string, password: string) => {
         const cleanEmail = email.trim().toLowerCase();
         if (!cleanEmail) {
-          return { success: false, error: 'Vui lòng nhập tên đăng nhập (Gmail)!' };
+          return { success: false, error: 'Please enter your username (Gmail)!' };
         }
         if (!password) {
-          return { success: false, error: 'Vui lòng nhập mật khẩu!' };
+          return { success: false, error: 'Please enter your password!' };
         }
 
         const foundUser = get().users.find(
@@ -163,14 +169,14 @@ export const useBookingStore = create<BookingState>()(
         if (!foundUser) {
           return {
             success: false,
-            error: 'Tài khoản không tồn tại trên hệ thống VKU. Vui lòng kiểm tra lại Gmail hoặc bấm Đăng ký.',
+            error: 'Account not found in the VKU system. Please check your Gmail or click Register.',
           };
         }
 
         if (foundUser.password !== password) {
           return {
             success: false,
-            error: 'Mật khẩu không chính xác. Vui lòng thử lại.',
+            error: 'Incorrect password. Please try again.',
           };
         }
 
@@ -201,13 +207,13 @@ export const useBookingStore = create<BookingState>()(
           return { success: false, error: 'Địa chỉ Gmail không hợp lệ!' };
         }
         if (!accountData.password || accountData.password.length < 3) {
-          return { success: false, error: 'Mật khẩu phải có ít nhất 3 ký tự!' };
+          return { success: false, error: 'Password must be at least 3 characters!' };
         }
         if (!accountData.name.trim()) {
-          return { success: false, error: 'Vui lòng nhập Họ và tên sinh viên!' };
+          return { success: false, error: 'Please enter the student full name!' };
         }
         if (!accountData.studentId.trim()) {
-          return { success: false, error: 'Vui lòng nhập Mã sinh viên!' };
+          return { success: false, error: 'Please enter your student ID!' };
         }
 
         const exists = get().users.find(
@@ -216,7 +222,7 @@ export const useBookingStore = create<BookingState>()(
         if (exists) {
           return {
             success: false,
-            error: 'Gmail này đã được đăng ký trong hệ thống! Vui lòng chuyển sang tab Đăng nhập.',
+            error: 'This Gmail is already registered! Please switch to the Log in tab.',
           };
         }
 
@@ -243,6 +249,85 @@ export const useBookingStore = create<BookingState>()(
 
         set((state) => ({
           users: [...state.users, newUser],
+          currentUser: profile,
+          isAuthenticated: true,
+        }));
+
+        return { success: true };
+      },
+
+      loginWithGoogle: async (googleData) => {
+        if (!googleData || !googleData.email) {
+          return { success: false, error: 'Thông tin tài khoản Google không hợp lệ.' };
+        }
+
+        const cleanEmail = googleData.email.trim().toLowerCase();
+        const existingUser = get().users.find(
+          (u) => u.email.trim().toLowerCase() === cleanEmail
+        );
+
+        if (existingUser) {
+          // Existing user — sign in and update avatar/name if provided
+          const updatedUser: UserAccount = {
+            ...existingUser,
+            name: googleData.name || existingUser.name,
+            avatarUrl: googleData.avatarUrl || existingUser.avatarUrl,
+          };
+
+          const profile: UserProfile = {
+            id: updatedUser.id,
+            studentId: updatedUser.studentId,
+            name: updatedUser.name,
+            email: updatedUser.email,
+            faculty: updatedUser.faculty,
+            phone: updatedUser.phone,
+            avatarUrl: updatedUser.avatarUrl,
+          };
+
+          set((state) => ({
+            users: state.users.map((u) => (u.id === existingUser.id ? updatedUser : u)),
+            currentUser: profile,
+            isAuthenticated: true,
+          }));
+
+          return { success: true };
+        }
+
+        // New Google account — auto register
+        let studentId = '';
+        const emailPrefix = cleanEmail.split('@')[0];
+        const itMatch = emailPrefix.match(/(\d{2}[a-zA-Z]+\d+)/i);
+        if (itMatch) {
+          studentId = itMatch[1].toUpperCase();
+        } else {
+          studentId = 'VKU-' + Math.floor(100000 + Math.random() * 900000);
+        }
+
+        const newGoogleUser: UserAccount = {
+          id: `usr-google-${Date.now()}`,
+          email: googleData.email.trim(),
+          password: '',
+          studentId,
+          name: googleData.name.trim() || emailPrefix,
+          faculty: cleanEmail.endsWith('@vku.udn.vn')
+            ? 'Software Engineering & Information Technology'
+            : 'General Student / Visitor',
+          phone: '+84 774505325',
+          avatarUrl: googleData.avatarUrl || 'local:avatar-quang',
+        };
+
+        const profile: UserProfile = {
+          id: newGoogleUser.id,
+          studentId: newGoogleUser.studentId,
+          name: newGoogleUser.name,
+          email: newGoogleUser.email,
+          faculty: newGoogleUser.faculty,
+          phone: newGoogleUser.phone,
+          avatarUrl: newGoogleUser.avatarUrl,
+        };
+
+        set((state) => ({
+          users: [...state.users, newGoogleUser],
           currentUser: profile,
           isAuthenticated: true,
         }));

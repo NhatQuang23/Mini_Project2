@@ -66,3 +66,15 @@ export interface UserProfile {
   phone: string;
   avatarUrl: string;
 }
+
+export interface UserAccount {
+  id: string;
+  email: string; // Tên đăng nhập là gmail
+  password: string;
+  studentId: string;
+  name: string;
+  faculty: string;
+  phone: string;
+  avatarUrl: string;
+}
+

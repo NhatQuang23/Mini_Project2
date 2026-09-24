@@ -10,8 +10,11 @@ import { RoomDetailScreen } from '../screens/RoomDetailScreen';
 import { MyBookingsScreen } from '../screens/MyBookingsScreen';
 import { BookingPassScreen } from '../screens/BookingPassScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
+import { AuthScreen } from '../screens/AuthScreen';
+import { useBookingStore } from '../store/useBookingStore';
 
 export type RootStackParamList = {
+  Auth: undefined;
   MainTabs: undefined;
   RoomDetail: { roomId: string };
   BookingPass: { bookingId: string };
@@ -81,6 +84,8 @@ function BottomTabs() {
 }
 
 export const AppNavigator: React.FC = () => {
+  const isAuthenticated = useBookingStore((state) => state.isAuthenticated);
+
   return (
     <NavigationContainer>
       <Stack.Navigator
@@ -89,22 +94,35 @@ export const AppNavigator: React.FC = () => {
           animation: 'slide_from_right',
         }}
       >
-        <Stack.Screen name="MainTabs" component={BottomTabs} />
-        <Stack.Screen
-          name="RoomDetail"
-          component={RoomDetailScreen}
-          options={{
-            animation: 'slide_from_bottom',
-          }}
-        />
-        <Stack.Screen
-          name="BookingPass"
-          component={BookingPassScreen}
-          options={{
-            animation: 'fade_from_bottom',
-          }}
-        />
+        {!isAuthenticated ? (
+          <Stack.Screen
+            name="Auth"
+            component={AuthScreen}
+            options={{
+              animation: 'fade',
+            }}
+          />
+        ) : (
+          <>
+            <Stack.Screen name="MainTabs" component={BottomTabs} />
+            <Stack.Screen
+              name="RoomDetail"
+              component={RoomDetailScreen}
+              options={{
+                animation: 'slide_from_bottom',
+              }}
+            />
+            <Stack.Screen
+              name="BookingPass"
+              component={BookingPassScreen}
+              options={{
+                animation: 'fade_from_bottom',
+              }}
+            />
+          </>
+        )}
       </Stack.Navigator>
     </NavigationContainer>
   );
 };
+

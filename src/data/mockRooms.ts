@@ -1,4 +1,4 @@
-import { Room } from '../types';
+import { Room, UserAccount, UserProfile } from '../types';
 
 export const MOCK_ROOMS: Room[] = [
   {
@@ -153,15 +153,7 @@ export const MOCK_ROOMS: Room[] = [
   },
 ];
 
-export const INITIAL_USER: {
-  id: string;
-  studentId: string;
-  name: string;
-  email: string;
-  faculty: string;
-  phone: string;
-  avatarUrl: string;
-} = {
+export const INITIAL_USER: UserProfile = {
   id: 'usr-vku-01',
   studentId: '23IT220',
   name: 'Phan Nguyễn Nhật Quang',
@@ -170,4 +162,18 @@ export const INITIAL_USER: {
   phone: '+84 774505325',
   avatarUrl: 'local:avatar-quang',
 };
+
+export const INITIAL_ACCOUNTS: UserAccount[] = [
+  {
+    id: 'usr-vku-01',
+    email: 'quangpnn.23it@vku.udn.vn',
+    password: '123',
+    studentId: '23IT220',
+    name: 'Phan Nguyễn Nhật Quang',
+    faculty: 'Software Engineering & Information Technology',
+    phone: '+84 774505325',
+    avatarUrl: 'local:avatar-quang',
+  },
+];
+
 

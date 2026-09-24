@@ -1,8 +1,8 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Booking, BuildingCode, EquipmentType, FilterState, Room, UserProfile } from '../types';
-import { MOCK_ROOMS, INITIAL_USER } from '../data/mockRooms';
+import { Booking, BuildingCode, EquipmentType, FilterState, Room, UserProfile, UserAccount } from '../types';
+import { MOCK_ROOMS, INITIAL_USER, INITIAL_ACCOUNTS } from '../data/mockRooms';
 import { TIME_SLOTS } from '../data/timeSlots';
 import { scheduleBookingReminder, cancelBookingReminder } from '../services/notificationService';
 
@@ -90,6 +90,21 @@ const INITIAL_BOOKINGS: Booking[] = [
 ];
 
 interface BookingState {
+  // Authentication & Accounts
+  isAuthenticated: boolean;
+  users: UserAccount[];
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  register: (accountData: {
+    email: string;
+    password: string;
+    studentId: string;
+    name: string;
+    faculty?: string;
+    phone?: string;
+    avatarUrl?: string;
+  }) => Promise<{ success: boolean; error?: string }>;
+  logout: () => void;
+
   // User session
   currentUser: UserProfile;
   updateProfile: (profile: Partial<UserProfile>) => void;
@@ -128,15 +143,141 @@ const DEFAULT_FILTERS: FilterState = {
 export const useBookingStore = create<BookingState>()(
   persist(
     (set, get) => ({
+      // Authentication
+      isAuthenticated: true,
+      users: INITIAL_ACCOUNTS,
+
+      login: async (email: string, password: string) => {
+        const cleanEmail = email.trim().toLowerCase();
+        if (!cleanEmail) {
+          return { success: false, error: 'Vui lòng nhập tên đăng nhập (Gmail)!' };
+        }
+        if (!password) {
+          return { success: false, error: 'Vui lòng nhập mật khẩu!' };
+        }
+
+        const foundUser = get().users.find(
+          (u) => u.email.trim().toLowerCase() === cleanEmail
+        );
+
+        if (!foundUser) {
+          return {
+            success: false,
+            error: 'Tài khoản không tồn tại trên hệ thống VKU. Vui lòng kiểm tra lại Gmail hoặc bấm Đăng ký.',
+          };
+        }
+
+        if (foundUser.password !== password) {
+          return {
+            success: false,
+            error: 'Mật khẩu không chính xác. Vui lòng thử lại.',
+          };
+        }
+
+        const profile: UserProfile = {
+          id: foundUser.id,
+          studentId: foundUser.studentId,
+          name: foundUser.name,
+          email: foundUser.email,
+          faculty: foundUser.faculty,
+          phone: foundUser.phone,
+          avatarUrl: foundUser.avatarUrl,
+        };
+
+        set({
+          isAuthenticated: true,
+          currentUser: profile,
+        });
+
+        return { success: true };
+      },
+
+      register: async (accountData) => {
+        const cleanEmail = accountData.email.trim().toLowerCase();
+        if (!cleanEmail) {
+          return { success: false, error: 'Vui lòng nhập Gmail làm tên đăng nhập!' };
+        }
+        if (!cleanEmail.includes('@')) {
+          return { success: false, error: 'Địa chỉ Gmail không hợp lệ!' };
+        }
+        if (!accountData.password || accountData.password.length < 3) {
+          return { success: false, error: 'Mật khẩu phải có ít nhất 3 ký tự!' };
+        }
+        if (!accountData.name.trim()) {
+          return { success: false, error: 'Vui lòng nhập Họ và tên sinh viên!' };
+        }
+        if (!accountData.studentId.trim()) {
+          return { success: false, error: 'Vui lòng nhập Mã sinh viên!' };
+        }
+
+        const exists = get().users.find(
+          (u) => u.email.trim().toLowerCase() === cleanEmail
+        );
+        if (exists) {
+          return {
+            success: false,
+            error: 'Gmail này đã được đăng ký trong hệ thống! Vui lòng chuyển sang tab Đăng nhập.',
+          };
+        }
+
+        const newUser: UserAccount = {
+          id: `usr-${Date.now()}`,
+          email: accountData.email.trim(),
+          password: accountData.password,
+          studentId: accountData.studentId.trim().toUpperCase(),
+          name: accountData.name.trim(),
+          faculty: accountData.faculty?.trim() || 'Software Engineering & Information Technology',
+          phone: accountData.phone?.trim() || '+84 774505325',
+          avatarUrl: accountData.avatarUrl?.trim() || 'local:avatar-quang',
+        };
+
+        const profile: UserProfile = {
+          id: newUser.id,
+          studentId: newUser.studentId,
+          name: newUser.name,
+          email: newUser.email,
+          faculty: newUser.faculty,
+          phone: newUser.phone,
+          avatarUrl: newUser.avatarUrl,
+        };
+
+        set((state) => ({
+          users: [...state.users, newUser],
+          currentUser: profile,
+          isAuthenticated: true,
+        }));
+
+        return { success: true };
+      },
+
+      logout: () => {
+        set({ isAuthenticated: false });
+      },
+
       currentUser: INITIAL_USER,
       updateProfile: (profile) =>
-        set((state) => ({
-          currentUser: { ...state.currentUser, ...profile },
-        })),
+        set((state) => {
+          const updatedUser = { ...state.currentUser, ...profile };
+          const updatedUsers = state.users.map((u) =>
+            u.id === updatedUser.id ? { ...u, ...profile } : u
+          );
+          return {
+            currentUser: updatedUser,
+            users: updatedUsers,
+          };
+        }),
       updateUserProfile: (profile) =>
-        set((state) => ({
-          currentUser: { ...state.currentUser, ...profile },
-        })),
+        set((state) => {
+          const updatedUser = { ...state.currentUser, ...profile };
+          const updatedUsers = state.users.map((u) =>
+            u.id === updatedUser.id ? { ...u, ...profile } : u
+          );
+          return {
+            currentUser: updatedUser,
+            users: updatedUsers,
+          };
+        }),
+
 
       rooms: MOCK_ROOMS,
       bookings: INITIAL_BOOKINGS,
@@ -278,7 +419,9 @@ export const useBookingStore = create<BookingState>()(
       name: 'vku-booking-storage-v3',
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (state) => ({
+        isAuthenticated: state.isAuthenticated,
         currentUser: state.currentUser,
+        users: state.users,
         bookings: state.bookings,
       }),
       onRehydrateStorage: () => (state) => {

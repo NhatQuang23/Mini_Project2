@@ -18,10 +18,25 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
 import { useBookingStore } from '../store/useBookingStore';
 
+const AVATAR_LOCAL = require('../../assets/avatar-quang.jpg');
+
+const getAvatarSource = (avatarUrl?: string) => {
+  if (
+    avatarUrl &&
+    (avatarUrl.startsWith('http://') ||
+      avatarUrl.startsWith('https://') ||
+      avatarUrl.startsWith('data:'))
+  ) {
+    return { uri: avatarUrl };
+  }
+  return AVATAR_LOCAL;
+};
+
 export const ProfileScreen: React.FC = () => {
   const currentUser = useBookingStore((state) => state.currentUser);
   const updateProfile = useBookingStore((state) => state.updateProfile);
   const bookings = useBookingStore((state) => state.bookings);
+  const logout = useBookingStore((state) => state.logout);
 
   // Edit Profile Modal States
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -35,6 +50,23 @@ export const ProfileScreen: React.FC = () => {
   const checkedInCount = bookings.filter((b) => b.status === 'checked-in').length;
   const totalHours = (activeCount + checkedInCount) * 2; // Each slot is 2 hours
 
+  const handleLogout = () => {
+    if (Platform.OS === 'web') {
+      if (confirm('Are you sure you want to log out of the VKU system?')) {
+        logout();
+      }
+    } else {
+      Alert.alert(
+        'Log out',
+        'Are you sure you want to log out of your student account?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Log out', style: 'destructive', onPress: logout },
+        ]
+      );
+    }
+  };
+
   const handleOpenEditModal = () => {
     setName(currentUser.name);
     setStudentId(currentUser.studentId);
@@ -43,6 +75,7 @@ export const ProfileScreen: React.FC = () => {
     setErrorMsg('');
     setIsEditModalOpen(true);
   };
+
 
   const handleSaveProfile = () => {
     if (!name.trim()) {
@@ -166,7 +199,7 @@ export const ProfileScreen: React.FC = () => {
           </View>
 
           <View style={styles.idCardBody}>
-            <Image source={{ uri: currentUser.avatarUrl }} style={styles.avatar} />
+            <Image source={getAvatarSource(currentUser.avatarUrl)} style={styles.avatar} />
             <View style={styles.idStudentInfo}>
               <Text style={styles.studentName}>{currentUser.name}</Text>
               <Text style={styles.studentIdCode}>ID: {currentUser.studentId}</Text>
@@ -257,6 +290,16 @@ export const ProfileScreen: React.FC = () => {
             prevent door collisions, and facilitate quick turnstile check-in across Buildings A, B, C, and V.
           </Text>
         </View>
+
+        {/* Logout Button */}
+        <TouchableOpacity
+          style={styles.logoutButton}
+          onPress={handleLogout}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="log-out-outline" size={18} color="#DC2626" />
+          <Text style={styles.logoutButtonText}>Log out of account</Text>
+        </TouchableOpacity>
       </ScrollView>
 
       {/* Edit Profile Modal */}
@@ -307,7 +350,7 @@ export const ProfileScreen: React.FC = () => {
                       setName(val);
                       if (errorMsg) setErrorMsg('');
                     }}
-                    placeholder="e.g. Lê Bảo Long"
+                    placeholder="e.g. Phan Nguyễn Nhật Quang"
                     placeholderTextColor="#94A3B8"
                   />
                 </View>
@@ -324,7 +367,7 @@ export const ProfileScreen: React.FC = () => {
                       setStudentId(val);
                       if (errorMsg) setErrorMsg('');
                     }}
-                    placeholder="e.g. 21IT128"
+                    placeholder="e.g. 23IT220"
                     placeholderTextColor="#94A3B8"
                     autoCapitalize="characters"
                   />
@@ -359,7 +402,7 @@ export const ProfileScreen: React.FC = () => {
                       setEmail(val);
                       if (errorMsg) setErrorMsg('');
                     }}
-                    placeholder="e.g. longlb.21it@vku.udn.vn"
+                    placeholder="e.g. quangpnn.23it@vku.udn.vn"
                     placeholderTextColor="#94A3B8"
                     keyboardType="email-address"
                     autoCapitalize="none"
@@ -774,5 +817,22 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: '#FFFFFF',
+  },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1.5,
+    borderColor: '#FECACA',
+    borderRadius: 14,
+    paddingVertical: 14,
+    marginTop: 14,
+  },
+  logoutButtonText: {
+    color: '#DC2626',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });
